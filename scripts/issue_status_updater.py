@@ -18,6 +18,38 @@ class IssueStatusUpdater:
         self.github_repo = os.environ.get('GITHUB_REPOSITORY')
         self.state_file = 'issue_status_state.json'
         
+    def _validate_environment(self):
+        """Validate that all required environment variables are set."""
+        missing_vars = []
+        
+        if not self.sheet_id:
+            missing_vars.append('GOOGLE_SHEET_ID')
+        
+        if not self.github_token:
+            missing_vars.append('GITHUB_TOKEN')
+            
+        if not self.github_repo:
+            missing_vars.append('GITHUB_REPOSITORY')
+        
+        if missing_vars:
+            print("❌ Missing required environment variables:")
+            for var in missing_vars:
+                print(f"   - {var}")
+            
+            print("\n🔧 Setup Instructions:")
+            print("1. For local testing:")
+            print(f"   export GOOGLE_SHEET_ID='your_sheet_id'")
+            print(f"   export GITHUB_TOKEN='your_personal_access_token'")
+            print(f"   export GITHUB_REPOSITORY='your_username/your_repo'")
+            print("\n2. For GitHub Actions:")
+            print("   - Add GOOGLE_SHEET_ID as a repository secret")
+            print("   - Add PERSONAL_ACCESS_TOKEN as a repository secret")
+            print("   - GITHUB_REPOSITORY is automatically set")
+            
+            return False
+        
+        return True
+        
     def _load_state(self):
         """Load the previous state of issue updates."""
         try:
@@ -257,8 +289,8 @@ class IssueStatusUpdater:
         """Main execution method."""
         print(f"🔄 Starting issue status updater at {datetime.now()}")
         
-        if not self.sheet_id:
-            print("❌ GOOGLE_SHEET_ID environment variable not set")
+        # Validate environment
+        if not self._validate_environment():
             return
         
         # Create status labels
