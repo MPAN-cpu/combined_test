@@ -201,6 +201,12 @@ This issue was automatically created from Google Sheet monitoring.
                 }) {
                     item {
                         id
+                        content {
+                            ... on Issue {
+                                title
+                                number
+                            }
+                        }
                     }
                 }
             }
@@ -220,19 +226,26 @@ This issue was automatically created from Google Sheet monitoring.
             
             if response.status_code == 200:
                 result = response.json()
+                print(f"🔍 GraphQL Response: {result}")  # Debug line
                 if 'errors' in result:
                     print(f"⚠️ GraphQL errors adding to project: {result['errors']}")
                     # Try alternative approach - create a draft issue
-                    self._create_draft_issue_in_project(paper_id)
+                    self._create_draft_issue_in_project(paper_id, f"Paper Review: {paper_id}")
                 else:
-                    print(f"✅ Added issue to project board for paper_id: {paper_id}")
+                    item_data = result['data']['addProjectV2Item']['item']
+                    if item_data and item_data.get('content'):
+                        issue_title = item_data['content']['title']
+                        issue_number = item_data['content']['number']
+                        print(f"✅ Added issue #{issue_number} to project board: '{issue_title}'")
+                    else:
+                        print(f"✅ Added issue to project board for paper_id: {paper_id}")
             else:
                 print(f"❌ Failed to add issue to project: {response.status_code}")
                 
         except Exception as e:
             print(f"❌ Error adding issue to project: {e}")
     
-    def _create_draft_issue_in_project(self, paper_id):
+    def _create_draft_issue_in_project(self, paper_id, issue_title):
         """Create a draft issue in the project as fallback."""
         try:
             url = "https://api.github.com/graphql"
@@ -255,9 +268,12 @@ This issue was automatically created from Google Sheet monitoring.
             }
             """
             
+            # Use the same title format as the actual issue
+            # issue_title = f"Paper Review: {paper_id}" # This line is now passed as an argument
+            
             variables = {
                 "projectId": self.project_id,
-                "title": f"Paper Review: {paper_id}"
+                "title": issue_title
             }
             
             data = {
@@ -272,7 +288,7 @@ This issue was automatically created from Google Sheet monitoring.
                 if 'errors' in result:
                     print(f"⚠️ GraphQL errors creating draft issue: {result['errors']}")
                 else:
-                    print(f"✅ Created draft issue in project for paper_id: {paper_id}")
+                    print(f"✅ Created draft issue in project: '{issue_title}'")
             else:
                 print(f"❌ Failed to create draft issue: {response.status_code}")
                 
