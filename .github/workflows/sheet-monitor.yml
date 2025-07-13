@@ -28,5 +28,5 @@ jobs:
         GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
         GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
         GITHUB_REPOSITORY: ${{ github.repository }}
-        GITHUB_PROJECT_ID: ${{ secrets.GITHUB_PROJECT_ID }}
+        PROJECT_ID: ${{ secrets.PROJECT_ID }}
       run: python scripts/sheet_monitor.py 
