@@ -2,6 +2,7 @@
 """
 Google Sheet Monitor for GitHub Issues
 Monitors a public Google Sheet for changes in the paper_id column and creates new GitHub issues.
+Automatically adds issues to a GitHub Project board.
 """
 
 import os
@@ -14,6 +15,7 @@ class SheetMonitor:
         self.sheet_id = os.environ.get('GOOGLE_SHEET_ID')
         self.github_token = os.environ.get('GITHUB_TOKEN')
         self.github_repo = os.environ.get('GITHUB_REPOSITORY')
+        self.project_id = '6'  # Hardcoded project ID
         self.state_file = 'sheet_state.json'
         
     def _load_state(self):
@@ -103,7 +105,14 @@ This issue was automatically created from Google Sheet monitoring.
             
             if response.status_code == 201:
                 issue_data = response.json()
-                print(f"✅ Created issue #{issue_data['number']} for paper_id: {paper_id}")
+                issue_id = issue_data['id']  # Get the issue ID for project board
+                issue_number = issue_data['number']
+                print(f"✅ Created issue #{issue_number} for paper_id: {paper_id}")
+                
+                # Add to project board if project ID is configured
+                if self.project_id:
+                    self._add_issue_to_project(issue_id, paper_id)
+                
                 return True
             else:
                 print(f"❌ Failed to create issue for {paper_id}: {response.status_code} - {response.text}")
@@ -112,6 +121,55 @@ This issue was automatically created from Google Sheet monitoring.
         except Exception as e:
             print(f"❌ Error creating GitHub issue for {paper_id}: {e}")
             return False
+    
+    def _add_issue_to_project(self, issue_id, paper_id):
+        """Add an issue to the GitHub Project board."""
+        try:
+            # GitHub GraphQL API endpoint
+            url = "https://api.github.com/graphql"
+            
+            headers = {
+                'Authorization': f'token {self.github_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            # GraphQL mutation to add item to project
+            query = """
+            mutation AddIssueToProject($projectId: ID!, $contentId: ID!) {
+                addProjectV2Item(input: {
+                    projectId: $projectId
+                    contentId: $contentId
+                }) {
+                    item {
+                        id
+                    }
+                }
+            }
+            """
+            
+            variables = {
+                "projectId": self.project_id,
+                "contentId": issue_id
+            }
+            
+            data = {
+                "query": query,
+                "variables": variables
+            }
+            
+            response = requests.post(url, headers=headers, json=data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'errors' in result:
+                    print(f"⚠️ GraphQL errors adding to project: {result['errors']}")
+                else:
+                    print(f"✅ Added issue to project board for paper_id: {paper_id}")
+            else:
+                print(f"❌ Failed to add issue to project: {response.status_code}")
+                
+        except Exception as e:
+            print(f"❌ Error adding issue to project: {e}")
     
     def _check_existing_issues(self, paper_id):
         """Check if an issue already exists for this paper_id."""
@@ -165,9 +223,11 @@ This issue was automatically created from Google Sheet monitoring.
             print(f"   export GOOGLE_SHEET_ID='your_sheet_id'")
             print(f"   export GITHUB_TOKEN='your_personal_access_token'")
             print(f"   export GITHUB_REPOSITORY='your_username/your_repo'")
+            print(f"   export GITHUB_PROJECT_ID='your_project_id' (optional)")
             print("\n2. For GitHub Actions:")
             print("   - Add GOOGLE_SHEET_ID as a repository secret")
             print("   - Add PERSONAL_ACCESS_TOKEN as a repository secret")
+            print("   - Add GITHUB_PROJECT_ID as a repository secret (optional)")
             print("   - GITHUB_REPOSITORY is automatically set")
             
             return False
@@ -181,6 +241,12 @@ This issue was automatically created from Google Sheet monitoring.
         # Validate environment
         if not self._validate_environment():
             return
+        
+        # Show project board status
+        if self.project_id:
+            print(f"📋 Project board ID: {self.project_id}")
+        else:
+            print("ℹ️ No project board configured (GITHUB_PROJECT_ID not set)")
         
         # Load previous state
         state = self._load_state()
