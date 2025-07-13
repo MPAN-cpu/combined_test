@@ -15,8 +15,66 @@ class SheetMonitor:
         self.sheet_id = os.environ.get('GOOGLE_SHEET_ID')
         self.github_token = os.environ.get('GITHUB_TOKEN')
         self.github_repo = os.environ.get('GITHUB_REPOSITORY')
-        self.project_id = '6'  # Hardcoded project ID
+        self.project_id = self._get_project_id_by_number('6')  # Get actual project ID for project number 6
         self.state_file = 'sheet_state.json'
+        
+    def _get_project_id_by_number(self, project_number):
+        """Get the actual project ID from GitHub using project number."""
+        try:
+            url = "https://api.github.com/graphql"
+            
+            headers = {
+                'Authorization': f'token {self.github_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Extract owner and repo from GITHUB_REPOSITORY
+            owner, repo = self.github_repo.split('/')
+            
+            query = """
+            query GetProject($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                    projectV2(number: $number) {
+                        id
+                        title
+                    }
+                }
+            }
+            """
+            
+            variables = {
+                "owner": owner,
+                "repo": repo,
+                "number": int(project_number)
+            }
+            
+            data = {
+                "query": query,
+                "variables": variables
+            }
+            
+            response = requests.post(url, headers=headers, json=data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'errors' in result:
+                    print(f"⚠️ GraphQL errors getting project: {result['errors']}")
+                    return None
+                
+                project = result['data']['repository']['projectV2']
+                if project:
+                    print(f"📋 Found project: {project['title']} (ID: {project['id']})")
+                    return project['id']
+                else:
+                    print(f"❌ Project with number {project_number} not found")
+                    return None
+            else:
+                print(f"❌ Failed to get project: {response.status_code}")
+                return None
+                
+        except Exception as e:
+            print(f"❌ Error getting project ID: {e}")
+            return None
         
     def _load_state(self):
         """Load the previous state of processed paper_ids."""
