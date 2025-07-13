@@ -282,11 +282,11 @@ This issue was automatically created from Google Sheet monitoring.
             print(f"   export GOOGLE_SHEET_ID='your_sheet_id'")
             print(f"   export GITHUB_TOKEN='your_personal_access_token'")
             print(f"   export GITHUB_REPOSITORY='your_username/your_repo'")
-            print(f"   export GITHUB_PROJECT_ID='your_project_id' (optional)")
+            print(f"   export PROJECT_ID='your_project_id' (optional)")
             print("\n2. For GitHub Actions:")
             print("   - Add GOOGLE_SHEET_ID as a repository secret")
             print("   - Add PERSONAL_ACCESS_TOKEN as a repository secret")
-            print("   - Add GITHUB_PROJECT_ID as a repository secret (optional)")
+            print("   - Add PROJECT_ID as a repository secret (optional)")
             print("   - GITHUB_REPOSITORY is automatically set")
             
             return False
