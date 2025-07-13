@@ -1,0 +1,11 @@
+paper_id,status,reviewer,notes
+P1,pending,John Doe,Waiting for assignment - high priority paper
+P2,in_progress,Alice Smith,Currently reviewing methodology section
+P3,reviewing,Bob Johnson,Final review stage - checking conclusions
+P4,completed,Carol Wilson,Review finished - paper approved with minor revisions
+P5,rejected,David Brown,Does not meet acceptance criteria - major methodological flaws
+P6,pending,Jane Miller,New submission - needs initial assessment
+P7,in_progress,Tom Davis,Reviewing experimental design and results
+P8,approved,Sarah Lee,Excellent paper - ready for publication
+P9,reviewing,Mike Chen,Peer review in progress - awaiting co-reviewer feedback
+P10,pending,Emma Taylor,Recently submitted - queue position 3 
