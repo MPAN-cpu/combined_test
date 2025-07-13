@@ -222,6 +222,8 @@ This issue was automatically created from Google Sheet monitoring.
                 result = response.json()
                 if 'errors' in result:
                     print(f"⚠️ GraphQL errors adding to project: {result['errors']}")
+                    # Try alternative approach - create a draft issue
+                    self._create_draft_issue_in_project(paper_id)
                 else:
                     print(f"✅ Added issue to project board for paper_id: {paper_id}")
             else:
@@ -229,6 +231,53 @@ This issue was automatically created from Google Sheet monitoring.
                 
         except Exception as e:
             print(f"❌ Error adding issue to project: {e}")
+    
+    def _create_draft_issue_in_project(self, paper_id):
+        """Create a draft issue in the project as fallback."""
+        try:
+            url = "https://api.github.com/graphql"
+            
+            headers = {
+                'Authorization': f'token {self.github_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            query = """
+            mutation CreateDraftIssue($projectId: ID!, $title: String!) {
+                addProjectV2DraftIssue(input: {
+                    projectId: $projectId
+                    title: $title
+                }) {
+                    projectItem {
+                        id
+                    }
+                }
+            }
+            """
+            
+            variables = {
+                "projectId": self.project_id,
+                "title": f"Paper Review: {paper_id}"
+            }
+            
+            data = {
+                "query": query,
+                "variables": variables
+            }
+            
+            response = requests.post(url, headers=headers, json=data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'errors' in result:
+                    print(f"⚠️ GraphQL errors creating draft issue: {result['errors']}")
+                else:
+                    print(f"✅ Created draft issue in project for paper_id: {paper_id}")
+            else:
+                print(f"❌ Failed to create draft issue: {response.status_code}")
+                
+        except Exception as e:
+            print(f"❌ Error creating draft issue: {e}")
     
     def _check_existing_issues(self, paper_id):
         """Check if an issue already exists for this paper_id."""
