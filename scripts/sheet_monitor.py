@@ -15,7 +15,8 @@ class SheetMonitor:
         self.sheet_id = os.environ.get('GOOGLE_SHEET_ID')
         self.github_token = os.environ.get('GITHUB_TOKEN')
         self.github_repo = os.environ.get('GITHUB_REPOSITORY')
-        self.project_id = self._get_project_id_by_number('6')  # Get actual project ID for project number 6
+        self.project_number = '6'  # Store project number
+        self.project_id = None  # Will be set in run() method
         self.state_file = 'sheet_state.json'
         
     def _get_project_id_by_number(self, project_number):
@@ -299,6 +300,9 @@ This issue was automatically created from Google Sheet monitoring.
         # Validate environment
         if not self._validate_environment():
             return
+        
+        # Get project ID based on the stored project number
+        self.project_id = self._get_project_id_by_number(self.project_number)
         
         # Show project board status
         if self.project_id:
