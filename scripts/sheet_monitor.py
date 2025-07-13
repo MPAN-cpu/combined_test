@@ -132,6 +132,9 @@ class SheetMonitor:
     def _create_github_issue(self, paper_id):
         """Create a new GitHub issue for the given paper_id."""
         try:
+            # First, create a draft issue in the project
+            draft_issue_id = self._create_draft_issue_in_project(paper_id, f"Paper Review: {paper_id}")
+            
             url = f"https://api.github.com/repos/{self.github_repo}/issues"
             
             headers = {
@@ -168,9 +171,9 @@ This issue was automatically created from Google Sheet monitoring.
                 issue_number = issue_data['number']
                 print(f"✅ Created issue #{issue_number} for paper_id: {paper_id}")
                 
-                # Add to project board if project ID is configured
-                if self.project_id:
-                    self._add_issue_to_project(issue_id, paper_id)
+                # Try to link the draft issue to the real issue
+                if draft_issue_id:
+                    self._link_draft_to_issue(draft_issue_id, issue_id, paper_id)
                 
                 return True
             else:
@@ -180,70 +183,6 @@ This issue was automatically created from Google Sheet monitoring.
         except Exception as e:
             print(f"❌ Error creating GitHub issue for {paper_id}: {e}")
             return False
-    
-    def _add_issue_to_project(self, issue_id, paper_id):
-        """Add an issue to the GitHub Project board."""
-        try:
-            # GitHub GraphQL API endpoint
-            url = "https://api.github.com/graphql"
-            
-            headers = {
-                'Authorization': f'token {self.github_token}',
-                'Content-Type': 'application/json'
-            }
-            
-            # GraphQL mutation to add item to project
-            query = """
-            mutation AddIssueToProject($projectId: ID!, $contentId: ID!) {
-                addProjectV2Item(input: {
-                    projectId: $projectId
-                    contentId: $contentId
-                }) {
-                    item {
-                        id
-                        content {
-                            ... on Issue {
-                                title
-                                number
-                            }
-                        }
-                    }
-                }
-            }
-            """
-            
-            variables = {
-                "projectId": self.project_id,
-                "contentId": issue_id
-            }
-            
-            data = {
-                "query": query,
-                "variables": variables
-            }
-            
-            response = requests.post(url, headers=headers, json=data)
-            
-            if response.status_code == 200:
-                result = response.json()
-                print(f"🔍 GraphQL Response: {result}")  # Debug line
-                if 'errors' in result:
-                    print(f"⚠️ GraphQL errors adding to project: {result['errors']}")
-                    # Try alternative approach - create a draft issue
-                    self._create_draft_issue_in_project(paper_id, f"Paper Review: {paper_id}")
-                else:
-                    item_data = result['data']['addProjectV2Item']['item']
-                    if item_data and item_data.get('content'):
-                        issue_title = item_data['content']['title']
-                        issue_number = item_data['content']['number']
-                        print(f"✅ Added issue #{issue_number} to project board: '{issue_title}'")
-                    else:
-                        print(f"✅ Added issue to project board for paper_id: {paper_id}")
-            else:
-                print(f"❌ Failed to add issue to project: {response.status_code}")
-                
-        except Exception as e:
-            print(f"❌ Error adding issue to project: {e}")
     
     def _create_draft_issue_in_project(self, paper_id, issue_title):
         """Create a draft issue in the project as fallback."""
@@ -287,13 +226,67 @@ This issue was automatically created from Google Sheet monitoring.
                 result = response.json()
                 if 'errors' in result:
                     print(f"⚠️ GraphQL errors creating draft issue: {result['errors']}")
+                    return None
                 else:
+                    draft_issue_id = result['data']['addProjectV2DraftIssue']['projectItem']['id']
                     print(f"✅ Created draft issue in project: '{issue_title}'")
+                    return draft_issue_id
             else:
                 print(f"❌ Failed to create draft issue: {response.status_code}")
+                return None
                 
         except Exception as e:
             print(f"❌ Error creating draft issue: {e}")
+            return None
+    
+    def _link_draft_to_issue(self, draft_issue_id, issue_id, paper_id):
+        """Try to link a draft issue to a real issue."""
+        try:
+            url = "https://api.github.com/graphql"
+            
+            headers = {
+                'Authorization': f'token {self.github_token}',
+                'Content-Type': 'application/json'
+            }
+            
+            # Try to update the draft issue to link to the real issue
+            query = """
+            mutation UpdateDraftIssue($itemId: ID!, $title: String!) {
+                updateProjectV2Item(input: {
+                    projectId: $itemId
+                    title: $title
+                }) {
+                    projectItem {
+                        id
+                    }
+                }
+            }
+            """
+            
+            variables = {
+                "itemId": draft_issue_id,
+                "title": f"Paper Review: {paper_id} (Issue #{issue_id})"
+            }
+            
+            data = {
+                "query": query,
+                "variables": variables
+            }
+            
+            response = requests.post(url, headers=headers, json=data)
+            
+            if response.status_code == 200:
+                result = response.json()
+                if 'errors' in result:
+                    print(f"⚠️ Could not link draft to issue: {result['errors']}")
+                    print(f"ℹ️ Draft issue created in project, but not linked to GitHub issue")
+                else:
+                    print(f"✅ Linked draft issue to GitHub issue for paper_id: {paper_id}")
+            else:
+                print(f"ℹ️ Draft issue created in project, but could not link to GitHub issue")
+                
+        except Exception as e:
+            print(f"ℹ️ Draft issue created in project, but could not link to GitHub issue: {e}")
     
     def _check_existing_issues(self, paper_id):
         """Check if an issue already exists for this paper_id."""
