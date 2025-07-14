@@ -17,6 +17,60 @@ class SheetMonitor:
         self.github_repo = os.environ.get('GITHUB_REPOSITORY')
         self.state_file = 'sheet_state.json'
         
+        # Define all available statuses with their colors
+        self.status_labels = {
+            'ready-to-code': {'name': 'Ready to Code', 'color': '0e8a16', 'description': 'Ready for development'},
+            'supervisor-check': {'name': 'Supervisor Check', 'color': 'fbca04', 'description': 'Awaiting supervisor review'},
+            'done': {'name': 'Done', 'color': '28a745', 'description': 'Task completed'},
+            'on-hold': {'name': 'On hold', 'color': 'd93f0b', 'description': 'Temporarily paused'},
+            'remove-from-pilot': {'name': 'Remove from Pilot', 'color': 'b60205', 'description': 'Remove from pilot program'}
+        }
+        
+    def _create_status_labels(self):
+        """Create all status labels if they don't exist."""
+        print("🏷️ Creating status labels...")
+        
+        for label_id, label_info in self.status_labels.items():
+            self._create_label_if_not_exists(label_id, label_info)
+    
+    def _create_label_if_not_exists(self, label_id, label_info):
+        """Create a label if it doesn't already exist."""
+        try:
+            # First, check if the label already exists
+            url = f"https://api.github.com/repos/{self.github_repo}/labels/{label_id}"
+            
+            headers = {
+                'Authorization': f'token {self.github_token}',
+                'Accept': 'application/vnd.github.v3+json'
+            }
+            
+            response = requests.get(url, headers=headers)
+            
+            if response.status_code == 200:
+                print(f"   ✅ Label '{label_info['name']}' already exists")
+                return
+            elif response.status_code == 404:
+                # Label doesn't exist, create it
+                create_url = f"https://api.github.com/repos/{self.github_repo}/labels"
+                
+                create_data = {
+                    'name': label_id,
+                    'color': label_info['color'],
+                    'description': label_info['description']
+                }
+                
+                create_response = requests.post(create_url, headers=headers, json=create_data)
+                
+                if create_response.status_code == 201:
+                    print(f"   ✅ Created label '{label_info['name']}'")
+                else:
+                    print(f"   ❌ Failed to create label '{label_info['name']}': {create_response.status_code}")
+            else:
+                print(f"   ⚠️ Error checking label '{label_info['name']}': {response.status_code}")
+                
+        except Exception as e:
+            print(f"   ❌ Error with label '{label_info['name']}': {e}")
+    
     def _load_state(self):
         """Load the previous state of processed paper_ids."""
         try:
@@ -88,6 +142,8 @@ class SheetMonitor:
 
 **Date Added:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
 
+**Status:** {self.status_labels['ready-to-code']['name']}
+
 ### Tasks
 - [ ] Review paper content
 - [ ] Analyze methodology
@@ -102,8 +158,15 @@ This issue was automatically created from Google Sheet monitoring.
 2. Click "Add items" 
 3. Select "Issues from this repository"
 4. Find and select this issue
+
+**Available Statuses:**
+- {self.status_labels['ready-to-code']['name']}
+- {self.status_labels['supervisor-check']['name']}
+- {self.status_labels['done']['name']}
+- {self.status_labels['on-hold']['name']}
+- {self.status_labels['remove-from-pilot']['name']}
 ''',
-                'labels': ['paper-review', 'automated']
+                'labels': ['paper-review', 'automated', 'ready-to-code']
             }
             
             response = requests.post(url, headers=headers, json=data)
@@ -191,6 +254,9 @@ This issue was automatically created from Google Sheet monitoring.
         if not self._validate_environment():
             return
         
+        # Create status labels if they don't exist
+        self._create_status_labels()
+
         # Load previous state
         state = self._load_state()
         processed_ids = set(state.get('processed_paper_ids', []))
